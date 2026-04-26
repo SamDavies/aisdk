@@ -108,6 +108,7 @@ impl From<LanguageModelOptions> for client::ChatCompletionsOptions {
             }),
             stream: None,
             stream_options: None,
+            usage: Some(types::UsageRequestOptions { include: Some(true) }),
             temperature: options.temperature.map(|t| t as f32 / 100.0),
             top_p: options.top_p.map(|t| t as f32 / 100.0),
             tools,

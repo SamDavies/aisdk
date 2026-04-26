@@ -48,6 +48,13 @@ pub(crate) struct ChatCompletionsOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stream_options: Option<StreamOptions>,
 
+    /// OpenRouter extension: when set to `{ include: true }`, OpenRouter
+    /// returns the per-request `cost` field inside `usage`. Native OpenAI
+    /// silently ignores this top-level field. We always set it so callers
+    /// can rely on exact dollar costs when routing through OpenRouter.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub usage: Option<UsageRequestOptions>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f32>,
 
@@ -179,6 +186,14 @@ pub(crate) struct StreamOptions {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include_obfuscation: Option<bool>,
+}
+
+/// Top-level `usage` request option recognised by OpenRouter to enable
+/// returning the `cost` field in the response usage block.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct UsageRequestOptions {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include: Option<bool>,
 }
 
 // ============================================================================

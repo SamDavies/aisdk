@@ -65,10 +65,13 @@ impl<M: ModelName> LanguageModel for OpenAIChatCompletions<M> {
         let mut options: client::ChatCompletionsOptions = options.into();
         options.model = self.options.model.clone();
         options.stream = Some(true);
-        // Note: stream_options is not sent to maintain compatibility with
-        // OpenAI-compatible providers that don't support this field (e.g., Z.ai)
-        // TODO: There should be a correct way to override options for different
-        // open ai compatible providers
+        // Enable streamed usage reporting. Without this, OpenAI/OpenRouter do
+        // not emit the final usage chunk on streams. OpenAI ignores the
+        // top-level `usage` field; OpenRouter uses it to include exact `cost`.
+        options.stream_options = Some(types::StreamOptions {
+            include_usage: Some(true),
+            include_obfuscation: None,
+        });
         self.options = options;
 
         let stream = self.send_and_stream(&self.settings.base_url).await?;
