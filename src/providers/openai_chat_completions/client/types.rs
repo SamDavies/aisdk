@@ -81,6 +81,11 @@ pub(crate) struct ChatCompletionsOptions {
     /// per-session / per-user spend tracking.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub user: Option<String>,
+
+    /// OpenRouter extension: groups related requests in the Sessions logs
+    /// view. Native OpenAI silently ignores this top-level field.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

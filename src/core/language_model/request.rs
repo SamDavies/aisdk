@@ -492,6 +492,14 @@ impl<M: LanguageModel> LanguageModelRequestBuilder<M, OptionsStage> {
         self
     }
 
+    /// Sets an OpenRouter session identifier (forwarded as the top-level
+    /// `session_id` request field). Groups related requests in OpenRouter's
+    /// Sessions logs view. Max 256 chars; silently ignored by native OpenAI.
+    pub fn session_id(mut self, session_id: impl Into<String>) -> Self {
+        self.options.session_id = Some(session_id.into());
+        self
+    }
+
     /// Builds the `LanguageModelRequest`.
     ///
     /// This method consumes the builder and returns the configured request.

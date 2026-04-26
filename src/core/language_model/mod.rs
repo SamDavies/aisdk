@@ -235,6 +235,11 @@ pub struct LanguageModelOptions {
     /// per-session / per-user tracking in the provider's dashboard.
     pub user: Option<String>,
 
+    /// OpenRouter-specific session identifier forwarded as the top-level
+    /// `session_id` request field. Groups related requests (e.g. a single
+    /// chat thread) in OpenRouter's Sessions logs view. Max 256 chars.
+    pub session_id: Option<String>,
+
     /// List of tools to use.
     pub(crate) tools: Option<ToolList>,
 
@@ -269,6 +274,7 @@ impl Debug for LanguageModelOptions {
             .field("on_step_start", &self.on_step_start.is_some())
             .field("on_step_finish", &self.on_step_finish.is_some())
             .field("user", &self.user)
+            .field("session_id", &self.session_id)
             .finish()
     }
 }

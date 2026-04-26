@@ -76,6 +76,7 @@ impl<M: LanguageModel> LanguageModelRequest<M> {
             on_step_start: self.options.on_step_start.clone(),
             on_step_finish: self.options.on_step_finish.clone(),
             user: self.options.user.clone(),
+            session_id: self.options.session_id.clone(),
             stop_reason: None,
             ..self.options
         };

@@ -117,6 +117,7 @@ impl From<LanguageModelOptions> for client::ChatCompletionsOptions {
             reasoning_effort,
             verbosity: None,
             user: options.user.clone(),
+            session_id: options.session_id.clone(),
         }
     }
 }
