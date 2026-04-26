@@ -84,6 +84,7 @@ impl<M: ModelName> LanguageModel for OpenAIChatCompletions<M> {
         let stream = stream.map(move |evt_res| match evt_res {
             Ok(types::ChatCompletionsStreamEvent::Chunk(chunk)) => {
                 let mut results = Vec::new();
+                let mut emitted_done_with_usage = false;
 
                 for choice in chunk.choices {
                     // Reasoning delta (for reasoning models like o1, DeepSeek R1)
@@ -135,6 +136,9 @@ impl<M: ModelName> LanguageModel for OpenAIChatCompletions<M> {
 
                     if let Some(finish_reason) = choice.finish_reason {
                         let usage = chunk.usage.clone().map(|u| u.into());
+                        if usage.is_some() {
+                            emitted_done_with_usage = true;
+                        }
 
                         match finish_reason.as_str() {
                             "stop" | "length" => {
@@ -181,6 +185,22 @@ impl<M: ModelName> LanguageModel for OpenAIChatCompletions<M> {
                             }
                         }
                     }
+                }
+
+                // OpenAI/OpenRouter streams (with stream_options.include_usage = true)
+                // emit the final usage in a trailing chunk that has `choices: []`
+                // and `usage: Some(...)`. The per-choice loop above never runs for
+                // such a chunk, so without this the exact prompt/completion/cached
+                // token counts and OpenRouter's `cost` field are silently dropped.
+                // Emit a synthetic Done carrying just the usage so downstream
+                // accumulation (`StreamTextResponse::usage()`) sees it.
+                if !emitted_done_with_usage
+                    && let Some(usage) = chunk.usage.clone().map(|u| u.into())
+                {
+                    results.push(LanguageModelStreamChunk::Done(AssistantMessage {
+                        content: LanguageModelResponseContentType::Text(String::new()),
+                        usage: Some(usage),
+                    }));
                 }
 
                 Ok(results)
