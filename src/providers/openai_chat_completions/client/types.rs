@@ -75,6 +75,12 @@ pub(crate) struct ChatCompletionsOptions {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verbosity: Option<String>,
+
+    /// Opaque end-user identifier (OpenAI standard). OpenRouter forwards
+    /// this and groups requests by it in their dashboard, enabling
+    /// per-session / per-user spend tracking.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

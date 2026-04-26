@@ -230,6 +230,11 @@ pub struct LanguageModelOptions {
     /// Level of reasoning effort for the model.
     pub reasoning_effort: Option<ReasoningEffort>,
 
+    /// Opaque end-user identifier forwarded to OpenAI-compatible providers
+    /// (including OpenRouter) as the `user` request field. Useful for
+    /// per-session / per-user tracking in the provider's dashboard.
+    pub user: Option<String>,
+
     /// List of tools to use.
     pub(crate) tools: Option<ToolList>,
 
@@ -263,6 +268,7 @@ impl Debug for LanguageModelOptions {
             .field("stop_when", &self.stop_when.is_some())
             .field("on_step_start", &self.on_step_start.is_some())
             .field("on_step_finish", &self.on_step_finish.is_some())
+            .field("user", &self.user)
             .finish()
     }
 }

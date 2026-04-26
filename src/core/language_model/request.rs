@@ -484,6 +484,14 @@ impl<M: LanguageModel> LanguageModelRequestBuilder<M, OptionsStage> {
         self
     }
 
+    /// Sets an opaque end-user identifier (forwarded as the `user` field on
+    /// OpenAI-compatible providers, including OpenRouter). Useful for
+    /// per-session / per-user tracking in the provider's dashboard.
+    pub fn user(mut self, user: impl Into<String>) -> Self {
+        self.options.user = Some(user.into());
+        self
+    }
+
     /// Builds the `LanguageModelRequest`.
     ///
     /// This method consumes the builder and returns the configured request.
