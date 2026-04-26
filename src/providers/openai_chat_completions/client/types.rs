@@ -218,6 +218,10 @@ pub(crate) struct Usage {
     pub prompt_tokens_details: Option<PromptTokensDetails>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub completion_tokens_details: Option<CompletionTokensDetails>,
+    /// OpenRouter-only: exact dollar cost of this generation. Native OpenAI
+    /// responses do not include this field, hence `Option`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

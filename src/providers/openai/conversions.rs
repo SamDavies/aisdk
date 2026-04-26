@@ -164,6 +164,7 @@ impl From<types::ResponseUsage> for Usage {
             output_tokens: Some(value.output_tokens as usize),
             cached_tokens: Some(value.input_tokens_details.cached_tokens as usize),
             reasoning_tokens: Some(value.output_tokens_details.reasoning_tokens as usize),
+            cost: None,
         }
     }
 }

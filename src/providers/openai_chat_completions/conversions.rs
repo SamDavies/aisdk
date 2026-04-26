@@ -257,6 +257,7 @@ impl From<types::Usage> for Usage {
             cached_tokens: usage
                 .prompt_tokens_details
                 .map(|d| d.cached_tokens as usize),
+            cost: usage.cost,
         }
     }
 }

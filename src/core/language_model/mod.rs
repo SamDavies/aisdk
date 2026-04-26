@@ -459,6 +459,11 @@ pub struct Usage {
     pub reasoning_tokens: Option<usize>,
     /// Number of cached tokens reused.
     pub cached_tokens: Option<usize>,
+    /// Exact monetary cost of the operation in US dollars, when reported by
+    /// the provider (e.g. OpenRouter populates `usage.cost`). `None` when the
+    /// provider does not surface a per-request dollar cost; in that case
+    /// callers must compute cost from `input_tokens` / `output_tokens`.
+    pub cost: Option<f64>,
 }
 
 impl Add for &Usage {
@@ -470,6 +475,11 @@ impl Add for &Usage {
             output_tokens: utils::sum_options(self.output_tokens, rhs.output_tokens),
             reasoning_tokens: utils::sum_options(self.reasoning_tokens, rhs.reasoning_tokens),
             cached_tokens: utils::sum_options(self.cached_tokens, rhs.cached_tokens),
+            cost: match (self.cost, rhs.cost) {
+                (Some(a), Some(b)) => Some(a + b),
+                (Some(a), None) | (None, Some(a)) => Some(a),
+                (None, None) => None,
+            },
         }
     }
 }

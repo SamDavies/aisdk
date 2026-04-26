@@ -173,6 +173,7 @@ impl From<types::UsageMetadata> for Usage {
             output_tokens: Some(value.candidates_token_count as usize),
             reasoning_tokens: None, // Gemini doesn't separate reasoning tokens in UsageMetadata v1beta
             cached_tokens: None,
+            cost: None,
         }
     }
 }
