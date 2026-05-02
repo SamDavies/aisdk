@@ -34,11 +34,13 @@ impl<M: ModelName> LanguageModel for OpenAIChatCompletions<M> {
         let mut contents = Vec::new();
 
         for choice in response.choices {
-            // Handle text content
-            if let Some(text) = choice.message.content
-                && !text.is_empty()
-            {
-                contents.push(LanguageModelResponseContentType::Text(text));
+            // Handle text content (with optional Sources footer when the
+            // model surfaced web-search citations).
+            if let Some(text) = choice.message.content {
+                let combined = append_sources_footer(text, choice.message.annotations.as_deref());
+                if !combined.is_empty() {
+                    contents.push(LanguageModelResponseContentType::Text(combined));
+                }
             }
 
             // Handle tool calls
@@ -79,6 +81,10 @@ impl<M: ModelName> LanguageModel for OpenAIChatCompletions<M> {
         // State for accumulating tool calls across chunks
         use std::collections::HashMap;
         let mut accumulated_tool_calls: HashMap<u32, (String, String, String)> = HashMap::new();
+        // Web-search citations arrive as separate annotation deltas; collect
+        // them and emit a "Sources:" footer as a final text delta before the
+        // terminating Done chunk.
+        let mut accumulated_citations: Vec<String> = Vec::new();
 
         // Map stream events to SDK stream chunks
         let stream = stream.map(move |evt_res| match evt_res {
@@ -103,6 +109,19 @@ impl<M: ModelName> LanguageModel for OpenAIChatCompletions<M> {
                         results.push(LanguageModelStreamChunk::Delta(
                             LanguageModelStreamChunkType::Text(content),
                         ));
+                    }
+
+                    // Web-search citation deltas. Deduplicate by URL — OpenAI
+                    // sometimes repeats the same annotation across consecutive
+                    // chunks while extending the cited text range.
+                    if let Some(annotations) = choice.delta.annotations {
+                        for annotation in annotations {
+                            if let types::Annotation::UrlCitation { url_citation } = annotation
+                                && !accumulated_citations.contains(&url_citation.url)
+                            {
+                                accumulated_citations.push(url_citation.url);
+                            }
+                        }
                     }
 
                     // Accumulate tool call deltas
@@ -138,6 +157,18 @@ impl<M: ModelName> LanguageModel for OpenAIChatCompletions<M> {
                         let usage = chunk.usage.clone().map(|u| u.into());
                         if usage.is_some() {
                             emitted_done_with_usage = true;
+                        }
+
+                        // Emit Sources footer as a final text delta, just
+                        // before the Done that terminates this turn.
+                        if matches!(finish_reason.as_str(), "stop" | "length")
+                            && !accumulated_citations.is_empty()
+                        {
+                            let footer = format_sources_footer(&accumulated_citations);
+                            accumulated_citations.clear();
+                            results.push(LanguageModelStreamChunk::Delta(
+                                LanguageModelStreamChunkType::Text(footer),
+                            ));
                         }
 
                         match finish_reason.as_str() {
@@ -216,5 +247,111 @@ impl<M: ModelName> LanguageModel for OpenAIChatCompletions<M> {
         });
 
         Ok(Box::pin(stream))
+    }
+}
+
+/// Format a list of cited URLs as a markdown footer prefixed by a blank line.
+/// Returns empty string when the slice is empty.
+fn format_sources_footer(urls: &[String]) -> String {
+    if urls.is_empty() {
+        return String::new();
+    }
+    let mut out = String::from("\n\nSources:");
+    for url in urls {
+        out.push_str("\n- ");
+        out.push_str(url);
+    }
+    out
+}
+
+/// Append a Sources footer (deduplicated by URL) to a text body when the
+/// supplied annotations contain url citations. No-op when none are present.
+fn append_sources_footer(text: String, annotations: Option<&[types::Annotation]>) -> String {
+    let urls: Vec<String> = annotations
+        .map(|anns| {
+            let mut seen: Vec<String> = Vec::new();
+            for ann in anns {
+                if let types::Annotation::UrlCitation { url_citation } = ann
+                    && !seen.contains(&url_citation.url)
+                {
+                    seen.push(url_citation.url.clone());
+                }
+            }
+            seen
+        })
+        .unwrap_or_default();
+
+    if urls.is_empty() {
+        return text;
+    }
+    let mut combined = text;
+    combined.push_str(&format_sources_footer(&urls));
+    combined
+}
+
+#[cfg(test)]
+mod sources_tests {
+    use super::*;
+
+    #[test]
+    fn footer_empty_when_no_urls() {
+        assert_eq!(format_sources_footer(&[]), "");
+    }
+
+    #[test]
+    fn footer_single_url() {
+        let urls = vec!["https://example.com".to_string()];
+        assert_eq!(
+            format_sources_footer(&urls),
+            "\n\nSources:\n- https://example.com"
+        );
+    }
+
+    #[test]
+    fn footer_multiple_urls() {
+        let urls = vec!["https://a.com".to_string(), "https://b.com".to_string()];
+        assert_eq!(
+            format_sources_footer(&urls),
+            "\n\nSources:\n- https://a.com\n- https://b.com"
+        );
+    }
+
+    #[test]
+    fn append_passes_through_when_no_annotations() {
+        assert_eq!(append_sources_footer("body".into(), None), "body");
+    }
+
+    #[test]
+    fn append_dedups_by_url() {
+        let anns = vec![
+            types::Annotation::UrlCitation {
+                url_citation: types::UrlCitation {
+                    url: "https://a.com".into(),
+                    title: None,
+                    start_index: None,
+                    end_index: None,
+                },
+            },
+            types::Annotation::UrlCitation {
+                url_citation: types::UrlCitation {
+                    url: "https://a.com".into(),
+                    title: Some("A".into()),
+                    start_index: Some(0),
+                    end_index: Some(5),
+                },
+            },
+            types::Annotation::UrlCitation {
+                url_citation: types::UrlCitation {
+                    url: "https://b.com".into(),
+                    title: None,
+                    start_index: None,
+                    end_index: None,
+                },
+            },
+        ];
+        assert_eq!(
+            append_sources_footer("body".into(), Some(&anns)),
+            "body\n\nSources:\n- https://a.com\n- https://b.com"
+        );
     }
 }

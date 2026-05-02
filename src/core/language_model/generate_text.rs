@@ -77,6 +77,7 @@ impl<M: LanguageModel> LanguageModelRequest<M> {
             on_step_finish: self.options.on_step_finish.clone(),
             user: self.options.user.clone(),
             session_id: self.options.session_id.clone(),
+            web_search_options: self.options.web_search_options.clone(),
             stop_reason: None,
             ..self.options
         };
@@ -335,6 +336,7 @@ mod tests {
                             output_tokens: Some(5),
                             reasoning_tokens: Some(2),
                             cached_tokens: Some(1),
+                            cost: None,
                         }),
                     }),
                 ),
@@ -347,6 +349,7 @@ mod tests {
                             output_tokens: Some(3),
                             reasoning_tokens: Some(1),
                             cached_tokens: Some(0),
+                            cost: None,
                         }),
                     }),
                 ),

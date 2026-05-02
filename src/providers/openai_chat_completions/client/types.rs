@@ -86,6 +86,13 @@ pub(crate) struct ChatCompletionsOptions {
     /// view. Native OpenAI silently ignores this top-level field.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
+
+    /// OpenAI native web-search controls. Setting this (even to an empty
+    /// object) enables the model's built-in web search on supported models
+    /// (e.g. GPT-5 family on the Vercel AI Gateway). Silently ignored by
+    /// providers that don't support it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub web_search_options: Option<crate::core::language_model::WebSearchOptions>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -103,6 +110,33 @@ pub(crate) struct ChatMessage {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
+
+    /// Web-search citations attached by OpenAI search-enabled models.
+    /// Always None on requests; populated on responses.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub annotations: Option<Vec<Annotation>>,
+}
+
+/// Citation/annotation attached to a message by OpenAI search-enabled models.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub(crate) enum Annotation {
+    UrlCitation {
+        url_citation: UrlCitation,
+    },
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub(crate) struct UrlCitation {
+    pub url: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_index: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end_index: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -330,6 +364,10 @@ pub(crate) struct Delta {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Vec<DeltaToolCall>>,
+
+    /// Web-search citations streamed alongside text deltas.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub annotations: Option<Vec<Annotation>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

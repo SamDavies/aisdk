@@ -500,6 +500,20 @@ impl<M: LanguageModel> LanguageModelRequestBuilder<M, OptionsStage> {
         self
     }
 
+    /// Enables OpenAI's native web-search capability on supported models
+    /// (e.g. the GPT-5 family via the Vercel AI Gateway).
+    ///
+    /// Pass [`crate::core::language_model::WebSearchOptions::default`] to
+    /// enable with provider defaults. Silently ignored by providers that
+    /// do not support web search.
+    pub fn with_web_search(
+        mut self,
+        options: crate::core::language_model::WebSearchOptions,
+    ) -> Self {
+        self.options.web_search_options = Some(options);
+        self
+    }
+
     /// Builds the `LanguageModelRequest`.
     ///
     /// This method consumes the builder and returns the configured request.

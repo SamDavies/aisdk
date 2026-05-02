@@ -22,6 +22,7 @@ impl From<LanguageModelOptions> for client::ChatCompletionsOptions {
                 name: None,
                 tool_calls: None,
                 tool_call_id: None,
+                annotations: None,
             });
         }
 
@@ -108,7 +109,9 @@ impl From<LanguageModelOptions> for client::ChatCompletionsOptions {
             }),
             stream: None,
             stream_options: None,
-            usage: Some(types::UsageRequestOptions { include: Some(true) }),
+            usage: Some(types::UsageRequestOptions {
+                include: Some(true),
+            }),
             temperature: options.temperature.map(|t| t as f32 / 100.0),
             top_p: options.top_p.map(|t| t as f32 / 100.0),
             tools,
@@ -118,6 +121,7 @@ impl From<LanguageModelOptions> for client::ChatCompletionsOptions {
             verbosity: None,
             user: options.user.clone(),
             session_id: options.session_id.clone(),
+            web_search_options: options.web_search_options.clone(),
         }
     }
 }
@@ -135,6 +139,7 @@ impl From<Message> for types::ChatMessage {
                 name: None,
                 tool_calls: None,
                 tool_call_id: None,
+                annotations: None,
             },
             Message::User(u) => types::ChatMessage {
                 role: types::Role::User,
@@ -142,6 +147,7 @@ impl From<Message> for types::ChatMessage {
                 name: None,
                 tool_calls: None,
                 tool_call_id: None,
+                annotations: None,
             },
             Message::Assistant(a) => match a.content {
                 LanguageModelResponseContentType::Text(text) => types::ChatMessage {
@@ -150,6 +156,7 @@ impl From<Message> for types::ChatMessage {
                     name: None,
                     tool_calls: None,
                     tool_call_id: None,
+                    annotations: None,
                 },
                 LanguageModelResponseContentType::ToolCall(tool_info) => types::ChatMessage {
                     role: types::Role::Assistant,
@@ -164,6 +171,7 @@ impl From<Message> for types::ChatMessage {
                         },
                     }]),
                     tool_call_id: None,
+                    annotations: None,
                 },
                 LanguageModelResponseContentType::Reasoning { content, .. } => {
                     // Chat Completions doesn't have separate reasoning messages
@@ -174,6 +182,7 @@ impl From<Message> for types::ChatMessage {
                         name: None,
                         tool_calls: None,
                         tool_call_id: None,
+                        annotations: None,
                     }
                 }
                 _ => types::ChatMessage {
@@ -182,6 +191,7 @@ impl From<Message> for types::ChatMessage {
                     name: None,
                     tool_calls: None,
                     tool_call_id: None,
+                    annotations: None,
                 },
             },
             Message::Tool(tool_result) => types::ChatMessage {
@@ -195,6 +205,7 @@ impl From<Message> for types::ChatMessage {
                 name: Some(tool_result.tool.name),
                 tool_calls: None,
                 tool_call_id: Some(tool_result.tool.id),
+                annotations: None,
             },
             Message::Developer(d) => types::ChatMessage {
                 role: types::Role::Developer,
@@ -202,6 +213,7 @@ impl From<Message> for types::ChatMessage {
                 name: None,
                 tool_calls: None,
                 tool_call_id: None,
+                annotations: None,
             },
         }
     }
@@ -337,6 +349,7 @@ mod tests {
                 accepted_prediction_tokens: None,
                 rejected_prediction_tokens: None,
             }),
+            cost: None,
         };
 
         let sdk_usage: Usage = usage.into();
@@ -344,5 +357,48 @@ mod tests {
         assert_eq!(sdk_usage.output_tokens, Some(50));
         assert_eq!(sdk_usage.cached_tokens, Some(20));
         assert_eq!(sdk_usage.reasoning_tokens, Some(10));
+    }
+
+    #[test]
+    fn web_search_options_default_serializes_to_empty_object() {
+        let opts = crate::core::language_model::WebSearchOptions::default();
+        assert_eq!(serde_json::to_string(&opts).unwrap(), "{}");
+    }
+
+    #[test]
+    fn web_search_options_omitted_when_none() {
+        let lm_opts = LanguageModelOptions {
+            web_search_options: None,
+            ..Default::default()
+        };
+        let cc: client::ChatCompletionsOptions = lm_opts.into();
+        let json = serde_json::to_value(&cc).unwrap();
+        assert!(
+            json.get("web_search_options").is_none(),
+            "web_search_options must be omitted when None, got: {json}"
+        );
+    }
+
+    #[test]
+    fn web_search_options_passes_through() {
+        let lm_opts = LanguageModelOptions {
+            web_search_options: Some(crate::core::language_model::WebSearchOptions::default()),
+            ..Default::default()
+        };
+        let cc: client::ChatCompletionsOptions = lm_opts.into();
+        let json = serde_json::to_value(&cc).unwrap();
+        assert_eq!(json.get("web_search_options"), Some(&serde_json::json!({})));
+    }
+
+    #[test]
+    fn web_search_options_with_context_size() {
+        let opts = crate::core::language_model::WebSearchOptions {
+            search_context_size: Some("high".into()),
+            user_location: None,
+        };
+        assert_eq!(
+            serde_json::to_value(&opts).unwrap(),
+            serde_json::json!({"search_context_size": "high"})
+        );
     }
 }
