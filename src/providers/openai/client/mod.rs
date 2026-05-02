@@ -50,6 +50,33 @@ impl<M: ModelName> LanguageModelClient for OpenAI<M> {
         let body = serde_json::to_string(&self.lm_options).unwrap();
         if std::env::var("DEBUG_OPENAI_RESPONSES_BODY").is_ok() {
             let _ = std::fs::write("/tmp/openai-responses-last-body.json", &body);
+            // Also append a one-line summary per request so we can verify
+            // prompt_cache_key stability across multiple messages without
+            // diffing 80KB JSON files.
+            use std::io::Write;
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("/tmp/openai-responses.log")
+            {
+                let v: serde_json::Value =
+                    serde_json::from_str(&body).unwrap_or(serde_json::Value::Null);
+                let summary = serde_json::json!({
+                    "ts": std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0),
+                    "model": v.get("model"),
+                    "prompt_cache_key": v.get("prompt_cache_key"),
+                    "safety_identifier": v.get("safety_identifier"),
+                    "input_items": v.get("input").and_then(|i| i.get("input_item_list"))
+                        .and_then(|a| a.as_array()).map(|a| a.len()),
+                    "tools": v.get("tools").and_then(|t| t.as_array()).map(|a| a.len()),
+                    "stream": v.get("stream"),
+                    "body_bytes": body.len(),
+                });
+                let _ = writeln!(f, "{}", summary);
+            }
         }
         reqwest::Body::from(body)
     }
