@@ -114,6 +114,12 @@ impl From<LanguageModelOptions> for client::OpenAILanguageModelOptions {
             stream: Some(false),
             top_p: options.top_p.map(|t| t as f32 / 100.0),
             tools,
+            // Use `user` (an opaque conversation/session id) as both the
+            // prompt cache key (pins requests with the same prefix to the
+            // same backend → ~10× higher cache hit rate) and the safety
+            // identifier (replaces the legacy `user` field on Responses).
+            prompt_cache_key: options.user.clone(),
+            safety_identifier: options.user,
         }
     }
 }

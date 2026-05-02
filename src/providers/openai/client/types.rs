@@ -30,6 +30,19 @@ pub(crate) struct OpenAILanguageModelOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(default)]
     pub(crate) tools: Option<Vec<ToolParams>>,
+    /// Opaque per-conversation key used by OpenAI to route requests with the
+    /// same prefix to the same backend, dramatically improving prefix-cache
+    /// hit rates. Set to a stable identifier per logical conversation
+    /// (typically a thread/session id).
+    /// <https://platform.openai.com/docs/guides/prompt-caching>
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(default)]
+    pub(crate) prompt_cache_key: Option<String>,
+    /// Opaque end-user identifier for abuse monitoring. Replaces the legacy
+    /// `user` field on the Responses API.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(default)]
+    pub(crate) safety_identifier: Option<String>,
 }
 
 /// Response structure from the OpenAI API.
