@@ -43,13 +43,6 @@ impl<M: ModelName> LanguageModelClient for OpenAIChatCompletions<M> {
 
     fn body(&self) -> reqwest::Body {
         let body = serde_json::to_string(&self.options).unwrap();
-        // Diagnostic: when DEBUG_OPENAI_CHAT_BODY=1 is set, dump the
-        // serialised request body to a tmp file so the operator can inspect
-        // exactly what was sent on a 4xx. The file is overwritten on every
-        // request — only useful for one-shot reproductions.
-        if std::env::var("DEBUG_OPENAI_CHAT_BODY").as_deref() == Ok("1") {
-            let _ = std::fs::write("/tmp/openai-chat-last-body.json", &body);
-        }
         reqwest::Body::from(body)
     }
 
