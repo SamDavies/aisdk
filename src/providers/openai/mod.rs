@@ -216,14 +216,22 @@ impl<M: ModelName> OpenAIBuilder<M> {
             return Err(Error::MissingField("api_key".to_string()));
         }
 
+        // Prefer the model set via the builder (e.g. via `model_name()` for
+        // DynamicModel); fall back to the static model name when unset.
+        let model = if self.options.model.is_empty() {
+            M::MODEL_NAME.to_string()
+        } else {
+            self.options.model.clone()
+        };
+
         let lm_options = OpenAILanguageModelOptions::builder()
-            .model(M::MODEL_NAME.to_string())
+            .model(model.clone())
             .build()
             .unwrap();
 
         let embedding_options = OpenAIEmbeddingOptions {
             input: vec![],
-            model: M::MODEL_NAME.to_string(),
+            model,
             user: None,
             dimensions: None,
             encoding_format: None,

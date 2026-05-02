@@ -231,7 +231,9 @@ pub(crate) enum SummaryType {
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
 pub(crate) struct TextConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<TextResponseFormat>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub verbosity: Option<String>,
 }
 
