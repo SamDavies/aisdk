@@ -48,6 +48,9 @@ impl<M: ModelName> LanguageModelClient for OpenAI<M> {
 
     fn body(&self) -> reqwest::Body {
         let body = serde_json::to_string(&self.lm_options).unwrap();
+        if std::env::var("DEBUG_OPENAI_RESPONSES_BODY").is_ok() {
+            let _ = std::fs::write("/tmp/openai-responses-last-body.json", &body);
+        }
         reqwest::Body::from(body)
     }
 
