@@ -187,6 +187,36 @@ pub(crate) enum ToolParams {
         strict: bool,
         description: Option<String>,
     },
+    /// Hosted web search tool. See
+    /// <https://developers.openai.com/api/docs/guides/tools-web-search>
+    WebSearch {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        search_context_size: Option<WebSearchContextSize>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        user_location: Option<WebSearchUserLocation>,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum WebSearchContextSize {
+    Low,
+    Medium,
+    High,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub(crate) struct WebSearchUserLocation {
+    #[serde(rename = "type")]
+    pub type_: String, // always "approximate"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub city: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub country: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timezone: Option<String>,
 }
 
 // auto, concise, or detailed

@@ -121,11 +121,22 @@ impl<M: ModelName> LanguageModel for OpenAI<M> {
                     match &msg {
                         // ---- Final OutputMessage ----
                         types::MessageItem::OutputMessage { content, .. } => {
-                            if let Some(types::OutputContent::OutputText { text, .. }) =
-                                content.first()
+                            if let Some(types::OutputContent::OutputText {
+                                text,
+                                annotations,
+                                ..
+                            }) = content.first()
                             {
+                                let combined =
+                                    append_sources_footer(text.clone(), annotations.as_slice());
+                                if combined.len() > text.len() {
+                                    let footer = combined[text.len()..].to_string();
+                                    result.push(LanguageModelStreamChunk::Delta(
+                                        LanguageModelStreamChunkType::Text(footer),
+                                    ));
+                                }
                                 result.push(LanguageModelStreamChunk::Done(AssistantMessage {
-                                    content: LanguageModelResponseContentType::new(text.clone()),
+                                    content: LanguageModelResponseContentType::new(combined),
                                     usage: Some(usage.clone()),
                                 }));
                             }
@@ -190,5 +201,94 @@ impl<M: ModelName> LanguageModel for OpenAI<M> {
         });
 
         Ok(Box::pin(stream))
+    }
+}
+
+/// Format a Sources footer (deduplicated by URL, preserving order) from
+/// Responses-API output annotations.
+fn format_sources_footer(urls: &[String]) -> String {
+    if urls.is_empty() {
+        return String::new();
+    }
+    let mut out = String::from("\n\nSources:");
+    for url in urls {
+        out.push_str("\n- ");
+        out.push_str(url);
+    }
+    out
+}
+
+/// Append a Sources footer to a body when annotations contain url citations.
+fn append_sources_footer(text: String, annotations: &[types::OutputTextAnnotation]) -> String {
+    let mut seen: Vec<String> = Vec::new();
+    for ann in annotations {
+        if let types::OutputTextAnnotation::UrlCitation { url, .. } = ann
+            && !seen.contains(url)
+        {
+            seen.push(url.clone());
+        }
+    }
+    if seen.is_empty() {
+        return text;
+    }
+    let mut combined = text;
+    combined.push_str(&format_sources_footer(&seen));
+    combined
+}
+
+#[cfg(test)]
+mod sources_tests {
+    use super::*;
+
+    #[test]
+    fn empty_returns_empty() {
+        assert_eq!(format_sources_footer(&[]), "");
+    }
+
+    #[test]
+    fn single_url() {
+        let out = format_sources_footer(&["https://example.com".into()]);
+        assert_eq!(out, "\n\nSources:\n- https://example.com");
+    }
+
+    #[test]
+    fn dedupes_and_preserves_order() {
+        let anns = vec![
+            types::OutputTextAnnotation::UrlCitation {
+                start_index: 0,
+                end_index: 1,
+                url: "https://a.com".into(),
+                title: "A".into(),
+            },
+            types::OutputTextAnnotation::UrlCitation {
+                start_index: 2,
+                end_index: 3,
+                url: "https://b.com".into(),
+                title: "B".into(),
+            },
+            types::OutputTextAnnotation::UrlCitation {
+                start_index: 4,
+                end_index: 5,
+                url: "https://a.com".into(),
+                title: "A2".into(),
+            },
+        ];
+        let out = append_sources_footer("body".into(), &anns);
+        assert_eq!(out, "body\n\nSources:\n- https://a.com\n- https://b.com");
+    }
+
+    #[test]
+    fn no_annotations_returns_text_unchanged() {
+        assert_eq!(append_sources_footer("body".into(), &[]), "body");
+    }
+
+    #[test]
+    fn ignores_non_url_annotations() {
+        let anns = vec![types::OutputTextAnnotation::FileCitation {
+            file_id: "f".into(),
+            filename: "f.txt".into(),
+            index: 0,
+        }];
+        assert_eq!(append_sources_footer("body".into(), &anns), "body");
     }
 }

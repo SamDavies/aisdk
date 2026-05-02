@@ -50,6 +50,45 @@ impl From<LanguageModelOptions> for client::OpenAILanguageModelOptions {
                 .collect()
         });
 
+        // Append the hosted `web_search` tool when web search is requested.
+        // OpenAI's Responses API exposes web search as a tool entry rather
+        // than a top-level field. See
+        // <https://developers.openai.com/api/docs/guides/tools-web-search>.
+        let tools = match (tools, options.web_search_options) {
+            (mut tools, Some(ws)) => {
+                let entry = tools.get_or_insert_with(Vec::new);
+                entry.push(types::ToolParams::WebSearch {
+                    search_context_size: ws.search_context_size.as_deref().and_then(|s| {
+                        match s.to_ascii_lowercase().as_str() {
+                            "low" => Some(types::WebSearchContextSize::Low),
+                            "medium" => Some(types::WebSearchContextSize::Medium),
+                            "high" => Some(types::WebSearchContextSize::High),
+                            _ => None,
+                        }
+                    }),
+                    user_location: ws
+                        .user_location
+                        .and_then(|v| serde_json::from_value::<serde_json::Value>(v).ok())
+                        .and_then(|v| {
+                            let obj = v.as_object()?;
+                            let str_field = |k: &str| {
+                                obj.get(k).and_then(|x| x.as_str()).map(|s| s.to_string())
+                            };
+                            Some(types::WebSearchUserLocation {
+                                type_: str_field("type")
+                                    .unwrap_or_else(|| "approximate".to_string()),
+                                city: str_field("city"),
+                                country: str_field("country"),
+                                region: str_field("region"),
+                                timezone: str_field("timezone"),
+                            })
+                        }),
+                });
+                Some(entry.clone())
+            }
+            (tools, None) => tools,
+        };
+
         let reasoning = options
             .reasoning_effort
             .map(|reasoning| types::ReasoningConfig {
@@ -302,5 +341,89 @@ mod tests {
         // These will be 0 because the details are default (None)
         assert_eq!(usage.cached_tokens, Some(0));
         assert_eq!(usage.reasoning_tokens, Some(0));
+    }
+}
+
+#[cfg(test)]
+mod web_search_tests {
+    use crate::core::language_model::{LanguageModelOptions, WebSearchOptions};
+    use crate::providers::openai::client::{OpenAILanguageModelOptions, types};
+
+    #[test]
+    fn web_search_none_omits_tool() {
+        let options = LanguageModelOptions {
+            web_search_options: None,
+            ..Default::default()
+        };
+        let lm: OpenAILanguageModelOptions = options.into();
+        let tools = lm.tools.unwrap_or_default();
+        assert!(
+            !tools
+                .iter()
+                .any(|t| matches!(t, types::ToolParams::WebSearch { .. }))
+        );
+    }
+
+    #[test]
+    fn web_search_default_appends_tool() {
+        let options = LanguageModelOptions {
+            web_search_options: Some(WebSearchOptions::default()),
+            ..Default::default()
+        };
+        let lm: OpenAILanguageModelOptions = options.into();
+        let tools = lm.tools.expect("tools should contain web_search");
+        let ws = tools
+            .iter()
+            .find_map(|t| match t {
+                types::ToolParams::WebSearch {
+                    search_context_size,
+                    user_location,
+                } => Some((search_context_size.clone(), user_location.clone())),
+                _ => None,
+            })
+            .expect("web_search tool present");
+        assert!(ws.0.is_none(), "context size should be unset");
+        assert!(ws.1.is_none(), "user_location should be unset");
+    }
+
+    #[test]
+    fn web_search_serializes_to_correct_shape() {
+        let options = LanguageModelOptions {
+            web_search_options: Some(WebSearchOptions::default()),
+            ..Default::default()
+        };
+        let lm: OpenAILanguageModelOptions = options.into();
+        let json = serde_json::to_value(&lm).unwrap();
+        let tools = json.get("tools").and_then(|t| t.as_array()).unwrap();
+        let ws = tools
+            .iter()
+            .find(|t| t.get("type").and_then(|x| x.as_str()) == Some("web_search"))
+            .expect("web_search tool serialized");
+        // Default options must serialize to just {"type":"web_search"}.
+        assert_eq!(ws.as_object().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn web_search_passes_context_size() {
+        let options = LanguageModelOptions {
+            web_search_options: Some(WebSearchOptions {
+                search_context_size: Some("high".to_string()),
+                user_location: None,
+            }),
+            ..Default::default()
+        };
+        let lm: OpenAILanguageModelOptions = options.into();
+        let tools = lm.tools.unwrap();
+        let ws = tools
+            .iter()
+            .find_map(|t| match t {
+                types::ToolParams::WebSearch {
+                    search_context_size,
+                    ..
+                } => Some(search_context_size.clone()),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(ws, Some(types::WebSearchContextSize::High));
     }
 }
