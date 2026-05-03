@@ -7,6 +7,12 @@ use serde::{Deserialize, Serialize};
 #[builder(setter(into), build_fn(error = "Error"))]
 pub(crate) struct OpenAILanguageModelOptions {
     pub(crate) model: String,
+    /// System prompt sent as the top-level `instructions` field on the
+    /// Responses API. Higher priority than messages and not subject to the
+    /// model's tool-calling drift.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(default)]
+    pub(crate) instructions: Option<String>,
     #[builder(default)]
     pub(crate) input: Option<Input>, // open ai requires input to be set
     #[serde(skip_serializing_if = "Option::is_none")]
